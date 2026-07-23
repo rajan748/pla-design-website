@@ -8,6 +8,7 @@ import {
   useSpring,
   useTransform,
   useMotionTemplate,
+  useScroll,
 } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -48,7 +49,7 @@ function FloatingCircles() {
   );
 }
 
-/* ---------- Detect touch devices — flashlight/tilt is a mouse-only interaction ---------- */
+/* ---------- Detect touch devices ---------- */
 function useIsTouchDevice() {
   const [isTouch, setIsTouch] = useState(false);
   useEffect(() => {
@@ -57,7 +58,7 @@ function useIsTouchDevice() {
   return isTouch;
 }
 
-/* ---------- Project card: flashlight color-reveal + tilt + spotlight focus ---------- */
+/* ---------- Project card ---------- */
 function ProjectCard({
   project,
   index,
@@ -77,17 +78,30 @@ function ProjectCard({
 
   const tiltSpring = { stiffness: 140, damping: 18, mass: 0.6 };
 
-  // tilt
+  // desktop mouse tilt
   const px = useMotionValue(0.5);
   const py = useMotionValue(0.5);
   const rotateX = useSpring(useTransform(py, [0, 1], [7, -7]), tiltSpring);
   const rotateY = useSpring(useTransform(px, [0, 1], [-7, 7]), tiltSpring);
 
-  // flashlight reveal — cursor position in px within the card
+  // desktop mouse-follow flashlight
   const cx = useMotionValue(200);
   const cy = useMotionValue(200);
   const radius = useSpring(0, { stiffness: 110, damping: 24, mass: 0.9 });
   const clipPath = useMotionTemplate`circle(${radius}px at ${cx}px ${cy}px)`;
+
+  // mobile scroll-linked sweep
+  const { scrollYProgress } = useScroll({
+    target: cardRef,
+    offset: ["start 90%", "end 25%"],
+  });
+  const sweepCx = useTransform(scrollYProgress, [0, 1], ["-10%", "110%"]);
+  const sweepRadius = useTransform(
+    scrollYProgress,
+    [0, 0.15, 0.85, 1],
+    [0, 260, 260, 0]
+  );
+  const sweepClipPath = useMotionTemplate`circle(${sweepRadius}px at ${sweepCx} 50%)`;
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
     const rect = cardRef.current?.getBoundingClientRect();
@@ -113,6 +127,7 @@ function ProjectCard({
   }
 
   const isLeft = index % 2 === 0;
+  const activeClipPath = isTouch ? sweepClipPath : clipPath;
 
   return (
     <motion.div
@@ -151,52 +166,44 @@ function ProjectCard({
           }
           className="relative h-[320px] sm:h-[380px] lg:h-[420px] rounded-3xl overflow-hidden mb-5 shadow-lg ring-1 ring-neutral-900/5 bg-neutral-200"
         >
-          {/* Base layer — blueprint / monochrome render (skipped on touch: shown fully colored) */}
-          {!isTouch && (
-            <div className="absolute inset-0">
-              <Image
-                src={project.image}
-                alt={project.title}
-                fill
-                className="object-cover"
-                style={{
-                  filter: "grayscale(1) contrast(1.2) brightness(0.92)",
-                }}
-              />
-              <div className="absolute inset-0 bg-neutral-900/20 mix-blend-multiply" />
-              {/* faint blueprint grid overlay */}
-              <div
-                className="absolute inset-0 opacity-[0.12]"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-                  backgroundSize: "24px 24px",
-                }}
-              />
-            </div>
-          )}
-
-          {/* Reveal layer — true color image, masked by cursor-follow circle on desktop, full on touch */}
-          <motion.div
-            className="absolute inset-0"
-            style={isTouch ? undefined : { clipPath }}
-          >
+          {/* Base layer — blueprint / monochrome render, shown on BOTH desktop and touch now */}
+          <div className="absolute inset-0">
             <Image
               src={project.image}
-              alt={isTouch ? project.title : ""}
+              alt={project.title}
+              fill
+              className="object-cover"
+              style={{
+                filter: "grayscale(1) contrast(1.2) brightness(0.92)",
+              }}
+            />
+            <div className="absolute inset-0 bg-neutral-900/20 mix-blend-multiply" />
+            <div
+              className="absolute inset-0 opacity-[0.12]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+              }}
+            />
+          </div>
+
+          {/* Reveal layer — masked by cursor flashlight (desktop) or scroll sweep (touch) */}
+          <motion.div className="absolute inset-0" style={{ clipPath: activeClipPath }}>
+            <Image
+              src={project.image}
+              alt={project.title}
               fill
               className="object-cover scale-[1.06] transition-transform duration-700 ease-out group-hover:scale-100"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0" />
-            {!isTouch && (
-              <motion.div
-                className="absolute inset-0"
-                style={{
-                  clipPath,
-                  boxShadow: "inset 0 0 45px 12px rgba(255,255,255,0.18)",
-                }}
-              />
-            )}
+            <motion.div
+              className="absolute inset-0"
+              style={{
+                clipPath: activeClipPath,
+                boxShadow: "inset 0 0 45px 12px rgba(255,255,255,0.18)",
+              }}
+            />
           </motion.div>
 
           {/* Category tag */}
@@ -215,7 +222,7 @@ function ProjectCard({
             {project.year}
           </span>
 
-          {/* Title reveals with the light (always visible on touch) */}
+          {/* Title */}
           <div
             style={{ transform: "translateZ(55px)" }}
             className={`absolute bottom-5 left-5 right-24 transition-all duration-500 delay-75 z-10 ${
@@ -233,7 +240,11 @@ function ProjectCard({
           {/* View badge */}
           <div
             style={{ transform: "translateZ(70px)" }}
-            className="absolute bottom-5 right-5 flex items-center gap-2 px-4 py-2 rounded-full bg-white opacity-0 translate-y-2 scale-90 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 transition-all duration-400 z-10"
+            className={`absolute bottom-5 right-5 flex items-center gap-2 px-4 py-2 rounded-full bg-white transition-all duration-400 z-10 ${
+              isTouch
+                ? "opacity-100"
+                : "opacity-0 translate-y-2 scale-90 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100"
+            }`}
           >
             <span className="text-xs font-medium text-neutral-900 tracking-wide">
               View Project
@@ -276,7 +287,6 @@ export default function OurWorkGrid() {
     <div className="relative">
       <FloatingCircles />
 
-      {/* Filter tabs */}
       <motion.div
         initial="hidden"
         whileInView="visible"
@@ -306,7 +316,6 @@ export default function OurWorkGrid() {
         ))}
       </motion.div>
 
-      {/* 2-column large photo grid */}
       <motion.div
         layout
         className="relative grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 pt-4"
