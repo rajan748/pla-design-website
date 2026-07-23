@@ -31,7 +31,6 @@ const PROJECTS = [
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-/* ---------- Floating decorative circles ---------- */
 function FloatingCircles() {
   return (
     <>
@@ -49,7 +48,6 @@ function FloatingCircles() {
   );
 }
 
-/* ---------- Detect touch devices ---------- */
 function useIsTouchDevice() {
   const [isTouch, setIsTouch] = useState(false);
   useEffect(() => {
@@ -58,7 +56,6 @@ function useIsTouchDevice() {
   return isTouch;
 }
 
-/* ---------- Project card ---------- */
 function ProjectCard({
   project,
   index,
@@ -78,28 +75,31 @@ function ProjectCard({
 
   const tiltSpring = { stiffness: 140, damping: 18, mass: 0.6 };
 
-  // desktop mouse tilt
   const px = useMotionValue(0.5);
   const py = useMotionValue(0.5);
   const rotateX = useSpring(useTransform(py, [0, 1], [7, -7]), tiltSpring);
   const rotateY = useSpring(useTransform(px, [0, 1], [-7, 7]), tiltSpring);
 
-  // desktop mouse-follow flashlight
   const cx = useMotionValue(200);
   const cy = useMotionValue(200);
   const radius = useSpring(0, { stiffness: 110, damping: 24, mass: 0.9 });
   const clipPath = useMotionTemplate`circle(${radius}px at ${cx}px ${cy}px)`;
 
-  // mobile scroll-linked sweep
+  // mobile scroll-linked sweep — wider range + spring smoothing = slower, smoother
   const { scrollYProgress } = useScroll({
     target: cardRef,
-    offset: ["start 90%", "end 25%"],
+    offset: ["start 105%", "end -5%"],
   });
-  const sweepCx = useTransform(scrollYProgress, [0, 1], ["-10%", "110%"]);
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 40,
+    damping: 20,
+    mass: 0.8,
+  });
+  const sweepCx = useTransform(smoothProgress, [0, 1], ["-15%", "115%"]);
   const sweepRadius = useTransform(
-    scrollYProgress,
-    [0, 0.15, 0.85, 1],
-    [0, 260, 260, 0]
+    smoothProgress,
+    [0, 0.1, 0.5, 0.9, 1],
+    [0, 260, 260, 260, 0]
   );
   const sweepClipPath = useMotionTemplate`circle(${sweepRadius}px at ${sweepCx} 50%)`;
 
@@ -145,7 +145,6 @@ function ProjectCard({
       style={{ perspective: 1400, transformStyle: "preserve-3d" }}
       className="relative"
     >
-      {/* Architectural plan-style annotation */}
       <div className="pointer-events-none select-none absolute -top-7 left-0 flex items-center gap-2 z-0">
         <span className="font-mono text-[11px] tracking-widest text-neutral-900/35">
           N&deg; {String(project.id).padStart(2, "0")}
@@ -166,7 +165,6 @@ function ProjectCard({
           }
           className="relative h-[320px] sm:h-[380px] lg:h-[420px] rounded-3xl overflow-hidden mb-5 shadow-lg ring-1 ring-neutral-900/5 bg-neutral-200"
         >
-          {/* Base layer — blueprint / monochrome render, shown on BOTH desktop and touch now */}
           <div className="absolute inset-0">
             <Image
               src={project.image}
@@ -188,7 +186,6 @@ function ProjectCard({
             />
           </div>
 
-          {/* Reveal layer — masked by cursor flashlight (desktop) or scroll sweep (touch) */}
           <motion.div className="absolute inset-0" style={{ clipPath: activeClipPath }}>
             <Image
               src={project.image}
@@ -206,7 +203,6 @@ function ProjectCard({
             />
           </motion.div>
 
-          {/* Category tag */}
           <span
             style={{ transform: "translateZ(60px)" }}
             className="absolute top-5 left-5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white text-[10px] tracking-widest uppercase font-medium z-10"
@@ -214,7 +210,6 @@ function ProjectCard({
             {project.category}
           </span>
 
-          {/* Year chip */}
           <span
             style={{ transform: "translateZ(45px)" }}
             className="absolute top-5 right-5 px-3 py-1 rounded-full bg-neutral-900/40 backdrop-blur-md text-white/90 text-[10px] tracking-wider font-medium z-10"
@@ -222,7 +217,6 @@ function ProjectCard({
             {project.year}
           </span>
 
-          {/* Title */}
           <div
             style={{ transform: "translateZ(55px)" }}
             className={`absolute bottom-5 left-5 right-24 transition-all duration-500 delay-75 z-10 ${
@@ -237,7 +231,6 @@ function ProjectCard({
             <p className="text-white/70 text-xs mt-0.5">{project.location}</p>
           </div>
 
-          {/* View badge */}
           <div
             style={{ transform: "translateZ(70px)" }}
             className={`absolute bottom-5 right-5 flex items-center gap-2 px-4 py-2 rounded-full bg-white transition-all duration-400 z-10 ${
@@ -253,7 +246,6 @@ function ProjectCard({
           </div>
         </motion.div>
 
-        {/* Static content below image */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="font-serif text-xl lg:text-2xl text-neutral-900 leading-snug group-hover:text-neutral-600 transition-colors duration-300">
